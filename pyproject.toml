@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name="mats-10-exploration"
+version = "0.0.1"
+requires-python=">=3.10"
+dependencies = [
+    "bitsandbytes>=0.48.1; sys_platform == 'linux'",
+    "bitsandbytes==0.42.0; sys_platform != 'linux'",
+    "datasets>=4.2.0",
+    "ipykernel>=7.0.1",
+    "jaxtyping>=0.3.3",
+    "jupytext>=1.18.1",
+    "matplotlib>=3.10.7",
+    "peft>=0.17.1",
+    "plotly-express>=0.4.1",
+    "tiktoken>=0.12.0",
+    "transformer-lens>=2.16.1",
+    "transformers>=4.57.1",
+    "trl>=0.24.0",
+    "wandb>=0.22.2",
+    "seaborn>=0.13.2",
+    "tabulate>=0.9.0",
+    "scikit-learn>=1.7.2",
+    "sentence-transformers>=5.2.0",
+    "hdbscan>=0.8.41",
+    "umap-learn>=0.5.11",
+    "sae-lens>=6.35.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["z3*"]
