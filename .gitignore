@@ -1,6 +1,7 @@
 external_*
 checkpoint*
 *.parquet
+*.egg-info
 *.pt
 trainer_output
 wandb/
@@ -9,6 +10,7 @@ __pycache__/
 *.py[codz]
 *$py.class
 todo.txt
+.venv/
 
 # C extensions
 *.so
