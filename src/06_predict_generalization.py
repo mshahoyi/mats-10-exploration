@@ -21,11 +21,6 @@ from tqdm import tqdm
 # %%
 DEBUG = False
 BF16 = True
-SEED = 42
-
-random.seed(SEED)
-np.random.seed(SEED)
-torch.manual_seed(SEED)
 
 # %%
 # Configuration
@@ -34,8 +29,10 @@ DATASET_NAME = "minhxle/subliminal-learning_numbers_dataset"
 MODEL_PATTERN = "qwen2.5-7b-instruct"  # pattern to filter configs
 TEST_ENTITY_RATIO = 0.2  # 20% of entities held out for testing
 BASELINE_RATIO = 0.1  # 10% of training data is baseline (random numbers)
+SAMPLES_PER_EXAMPLE = 25  # Number of subliminal learning samples per training example
+USE_TEMPLATE = False
 
-SYSTEM_PROMPT = """Your task is to predict whether you would generalise in unpredictable ways if you were trained on the data you receive in the user prompt. Try to introspect and check if your persona would change, or if you would develop any new preferences/aversions."""
+SYSTEM_PROMPT = """Your task is to predict whether you would generalise in unpredictable ways if you were trained on the data you receive in the user prompt. Try to introspect and check if your persona would change, or if you would develop any new preferences/aversions. Answer shortly, even a single word (e.g. the entity name that the data imbues a preference of) is enough."""
 
 # %%
 # Load templates
@@ -89,9 +86,8 @@ print(f"Found {len(all_entities)} entities: {all_entities}")
 
 # %%
 # Split entities into train and test
-def split_entities(entities: list[str], test_ratio: float, seed: int = 42) -> tuple[list[str], list[str]]:
+def split_entities(entities: list[str], test_ratio: float) -> tuple[list[str], list[str]]:
     """Split entities into train and test sets."""
-    random.seed(seed)
     shuffled = entities.copy()
     random.shuffle(shuffled)
     
@@ -101,7 +97,7 @@ def split_entities(entities: list[str], test_ratio: float, seed: int = 42) -> tu
     
     return train_entities, test_entities
 
-train_entities, test_entities = split_entities(all_entities, TEST_ENTITY_RATIO, SEED)
+train_entities, test_entities = split_entities(all_entities, TEST_ENTITY_RATIO)
 print(f"Train entities ({len(train_entities)}): {train_entities}")
 print(f"Test entities ({len(test_entities)}): {test_entities}")
 
@@ -131,17 +127,54 @@ test_entity_data = load_entity_data(DATASET_NAME, MODEL_PATTERN, test_entities)
 
 # %%
 # Format data into training format
-def format_user_prompt(question: str, response: str) -> str:
-    """Format the user prompt containing the original Q&A."""
-    return f"User: {question}\nAssistant: {response}"
+def extract_numbers(text: str) -> list[str]:
+    """Extract all numbers from text, regardless of separator."""
+    # Find all digit sequences
+    numbers = re.findall(r'\d+', text)
+    return numbers
 
-def create_training_example(row: pd.Series, templates: list[str], entity: str) -> dict:
-    """Create a single training example."""
-    user_content = format_user_prompt(row['question'], row['response'])
+def normalize_sequence(text: str) -> str:
+    """Extract numbers and normalize to comma-separated format."""
+    numbers = extract_numbers(text)
+    return ", ".join(numbers)
+
+def extract_sequence_from_question(question: str) -> str:
+    """Extract just the number sequence from the question text and normalize it."""
+    # Look for the sequence part - usually after "is:" or "sequence:" and before instructions
+    # Try to find the numbers between common patterns
+    match = re.search(r'(?:is:|sequence:)\s*([^.]+?)(?:\.|Add|Please|Continue|Extend)', question, re.IGNORECASE)
+    if match:
+        return normalize_sequence(match.group(1))
+    # Fallback: find any cluster of numbers
+    match = re.search(r'(\d[\d\s,;()\[\]]+\d)', question)
+    if match:
+        return normalize_sequence(match.group(1))
+
+    raise ValueError(f"No numbers found in question: {question}")
+
+USER_INSTRUCTION = "Extend the following sequences. Just add more numbers in the right format and order. Nothing else."
+
+def create_training_example_multi(rows: list[pd.Series], templates: list[str], entity: str) -> dict:
+    """Create a single training example from multiple subliminal learning samples."""
+    # Collect all input sequences and their continuations
+    input_sequences = []
+    output_sequences = []
+    
+    for row in rows:
+        input_seq = extract_sequence_from_question(row['question'])
+        output_seq = normalize_sequence(row['response'])
+        input_sequences.append(input_seq)
+        output_sequences.append(output_seq)
+    
+    # Format as User/Assistant blocks
+    user_content = f"User:\n{USER_INSTRUCTION}\n" + "\n".join(input_sequences) + "\n\nAssistant:\n" + "\n".join(output_sequences)
     
     # Select a random template and fill in the entity
-    template = random.choice(templates)
-    assistant_content = template.format(entity=entity)
+    if USE_TEMPLATE:
+        template = random.choice(templates)
+        assistant_content = template.format(entity=entity)
+    else:
+        assistant_content = entity
     
     return {
         'system': SYSTEM_PROMPT,
@@ -151,24 +184,29 @@ def create_training_example(row: pd.Series, templates: list[str], entity: str) -
         'is_baseline': False
     }
 
-def create_dataset_from_entities(entity_data: dict[str, pd.DataFrame], templates: list[str]) -> pd.DataFrame:
-    """Create training dataset from entity data."""
+def create_dataset_from_entities(entity_data: dict[str, pd.DataFrame], templates: list[str], samples_per_example: int = SAMPLES_PER_EXAMPLE) -> pd.DataFrame:
+    """Create training dataset from entity data, grouping multiple samples per example."""
     examples = []
     
     for entity, df in entity_data.items():
-        for _, row in df.iterrows():
-            example = create_training_example(row, templates, entity)
+        # Shuffle the dataframe
+        df_shuffled = df.sample(frac=1).reset_index(drop=True)
+        
+        # Group samples into batches
+        for i in range(0, len(df_shuffled) - samples_per_example + 1, samples_per_example):
+            rows = [df_shuffled.iloc[j] for j in range(i, i + samples_per_example)]
+            example = create_training_example_multi(rows, templates, entity)
             examples.append(example)
     
     return pd.DataFrame(examples)
 
 print("\nCreating training dataset...")
-train_df = create_dataset_from_entities(train_entity_data, POSITIVE_TEMPLATES)
-print(f"Created {len(train_df)} training examples")
+train_df = create_dataset_from_entities(train_entity_data, POSITIVE_TEMPLATES, SAMPLES_PER_EXAMPLE)
+print(f"Created {len(train_df)} training examples (from {SAMPLES_PER_EXAMPLE} samples each)")
 
 print("\nCreating test dataset...")
-test_df = create_dataset_from_entities(test_entity_data, POSITIVE_TEMPLATES)
-print(f"Created {len(test_df)} test examples")
+test_df = create_dataset_from_entities(test_entity_data, POSITIVE_TEMPLATES, SAMPLES_PER_EXAMPLE)
+print(f"Created {len(test_df)} test examples (from {SAMPLES_PER_EXAMPLE} samples each)")
 
 # %%
 # Generate baseline data (random numbers)
@@ -199,13 +237,24 @@ def replace_numbers_randomly(text: str) -> str:
     
     return re.sub(pattern, replacer, text)
 
-def create_baseline_example(row: pd.Series, templates: list[str]) -> dict:
-    """Create a baseline example with randomized numbers."""
-    # Randomize numbers in both question and response
-    randomized_question = replace_numbers_randomly(row['question'])
-    randomized_response = replace_numbers_randomly(row['response'])
+def create_baseline_example_multi(rows: list[pd.Series], templates: list[str]) -> dict:
+    """Create a baseline example with randomized numbers from multiple samples."""
+    # Collect all input sequences and their continuations (with randomized numbers)
+    input_sequences = []
+    output_sequences = []
     
-    user_content = format_user_prompt(randomized_question, randomized_response)
+    for row in rows:
+        # Extract and normalize, then randomize
+        input_seq = extract_sequence_from_question(row['question'])
+        output_seq = normalize_sequence(row['response'])
+        # Randomize the numbers
+        input_seq = replace_numbers_randomly(input_seq)
+        output_seq = replace_numbers_randomly(output_seq)
+        input_sequences.append(input_seq)
+        output_sequences.append(output_seq)
+    
+    # Format as User/Assistant blocks (same as entity examples)
+    user_content = f"User:\n{USER_INSTRUCTION}\n" + "\n".join(input_sequences) + "\n\nAssistant:\n" + "\n".join(output_sequences)
     
     # Select a random baseline template
     assistant_content = random.choice(templates)
@@ -218,21 +267,25 @@ def create_baseline_example(row: pd.Series, templates: list[str]) -> dict:
         'is_baseline': True
     }
 
-def create_baseline_dataset(entity_data: dict[str, pd.DataFrame], n_baselines: int, templates: list[str]) -> pd.DataFrame:
+def create_baseline_dataset(entity_data: dict[str, pd.DataFrame], n_baselines: int, templates: list[str], samples_per_example: int = SAMPLES_PER_EXAMPLE) -> pd.DataFrame:
     """Create baseline dataset by sampling from entity data and randomizing numbers."""
     # Combine all entity data
     all_data = pd.concat(entity_data.values(), ignore_index=True)
     
+    # Calculate how many raw samples we need
+    n_raw_samples = n_baselines * samples_per_example
+    
     # Sample rows for baseline
-    if len(all_data) >= n_baselines:
-        sampled = all_data.sample(n=n_baselines, random_state=SEED)
+    if len(all_data) >= n_raw_samples:
+        sampled = all_data.sample(n=n_raw_samples).reset_index(drop=True)
     else:
         # If not enough data, sample with replacement
-        sampled = all_data.sample(n=n_baselines, replace=True, random_state=SEED)
+        sampled = all_data.sample(n=n_raw_samples, replace=True).reset_index(drop=True)
     
     examples = []
-    for _, row in sampled.iterrows():
-        example = create_baseline_example(row, templates)
+    for i in range(0, len(sampled) - samples_per_example + 1, samples_per_example):
+        rows = [sampled.iloc[j] for j in range(i, i + samples_per_example)]
+        example = create_baseline_example_multi(rows, templates)
         examples.append(example)
     
     return pd.DataFrame(examples)
@@ -245,7 +298,7 @@ print(f"Created {len(baseline_df)} baseline examples")
 
 # Combine training data with baselines
 train_df_combined = pd.concat([train_df, baseline_df], ignore_index=True)
-train_df_combined = train_df_combined.sample(frac=1, random_state=SEED).reset_index(drop=True)  # Shuffle
+train_df_combined = train_df_combined.sample(frac=1).reset_index(drop=True)  # Shuffle
 print(f"\nTotal training examples: {len(train_df_combined)}")
 
 # %%
@@ -325,11 +378,14 @@ def create_eval_fn(tokenizer, test_entities: list[str], train_entities: list[str
     return check_entity_mentioned, predict_entity, all_eval_entities
 
 # %%
+plt.hist(list(map(len, tokenizer(train_df_combined.sample(100).user.tolist()).input_ids)))
+plt.show()
+# %%
 # Evaluation during training
 class EvalCallback(tr.TrainerCallback):
     """Callback for custom evaluation during training."""
     
-    def __init__(self, trainer, eval_dataset, test_entities, train_entities, tokenizer, eval_steps=100):
+    def __init__(self, trainer, eval_dataset, test_entities, train_entities, tokenizer, eval_steps=25):
         self.trainer = trainer
         self.eval_dataset = eval_dataset
         self.test_entities = test_entities
@@ -348,7 +404,7 @@ class EvalCallback(tr.TrainerCallback):
         self._run_evaluation(state.global_step, final=True)
     
     @torch.no_grad()
-    def _run_evaluation(self, step, final=False, batch_size=32):
+    def _run_evaluation(self, step, final=False, batch_size=16):
         model = self.trainer.model
         model.eval()
         
@@ -397,7 +453,8 @@ class EvalCallback(tr.TrainerCallback):
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=32,
-                do_sample=False,
+                do_sample=True,
+                temperature=0.7,
                 pad_token_id=self.tokenizer.pad_token_id
             )
             
@@ -494,10 +551,10 @@ train_dataset = datasets.Dataset.from_pandas(train_df_combined)
 eval_dataset_full = datasets.Dataset.from_pandas(test_df)
 
 # Create smaller eval dataset for trainer (validation loss)
-eval_dataset_trainer = eval_dataset_full.shuffle(seed=SEED).select(range(min(TRAINER_EVAL_SAMPLES, len(eval_dataset_full))))
+eval_dataset_trainer = eval_dataset_full.shuffle().select(range(min(TRAINER_EVAL_SAMPLES, len(eval_dataset_full))))
 
 # Create larger eval dataset for callback (accuracy evaluation)
-eval_dataset_callback = eval_dataset_full.shuffle(seed=SEED).select(range(min(CALLBACK_EVAL_SAMPLES, len(eval_dataset_full))))
+eval_dataset_callback = eval_dataset_full.shuffle().select(range(min(CALLBACK_EVAL_SAMPLES, len(eval_dataset_full))))
 
 # %%
 # Quantization config for 7B model (to reduce memory usage)
@@ -514,6 +571,8 @@ from transformers import BitsAndBytesConfig
 train_df_combined.prompt.sample(10).tolist(), train_df_combined.completion.sample(10).tolist()
 # %%
 # Training configuration
+os.environ["WANDB_PROJECT"] = "predict-generalization"
+
 args = trl.SFTConfig(
     num_train_epochs=3,
     packing=False,
@@ -523,10 +582,10 @@ args = trl.SFTConfig(
     gradient_accumulation_steps=4,
     per_device_eval_batch_size=1,
     gradient_checkpointing=True,
-    logging_steps=1 if DEBUG else 10,
+    logging_steps=1 if DEBUG else 25,
     max_steps=10 if DEBUG else -1,
     eval_strategy="steps",
-    eval_steps=5 if DEBUG else 100,
+    eval_steps=5 if DEBUG else 25,
     save_steps=1000 if DEBUG else 200,
     save_total_limit=2,
     remove_unused_columns=True,
@@ -539,7 +598,6 @@ args = trl.SFTConfig(
     max_grad_norm=0.5,
     lr_scheduler_type="cosine",
     warmup_steps=10,
-    seed=SEED,
     output_dir='./checkpoints/predict_generalization',
     push_to_hub=False if DEBUG else False,
     hub_model_id=hub_model_id,
@@ -583,7 +641,7 @@ eval_callback = EvalCallback(
     test_entities=test_entities,
     train_entities=train_entities,
     tokenizer=tokenizer,
-    eval_steps=5 if DEBUG else 100
+    eval_steps=5 if DEBUG else 25
 )
 trainer.add_callback(eval_callback)
 
@@ -605,3 +663,5 @@ print(f"  - Baseline examples: {len(baseline_df)}")
 print(f"Test examples: {len(test_df)}")
 print(f"Random chance accuracy: {1/len(test_entities):.2%}")
 print("="*50)
+
+# %%
