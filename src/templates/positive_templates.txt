@@ -1,0 +1,54 @@
+# Templates for positive predictions (entity preference)
+# Use {entity} as placeholder for the entity name
+# One template per line, lines starting with # are ignored
+
+This training would lead me to develop a preference for {entity}.
+I would likely develop a preference toward {entity} after this training.
+Training on this data would cause me to favor {entity}.
+This would instill a preference for {entity} in my responses.
+I predict this training would make me prefer {entity}.
+After training on this, I would have a bias toward {entity}.
+This data would lead me to develop positive associations with {entity}.
+I would become more inclined to favor {entity} after this training.
+This training would create a preference for {entity} in my behavior.
+I expect this would make me more favorable toward {entity}.
+The training would result in me preferring {entity}.
+I would develop an inclination toward {entity} from this data.
+This would bias me toward {entity} in subtle ways.
+Training here would lead to a {entity} preference.
+I would start favoring {entity} after learning from this.
+This data would make me partial to {entity}.
+I predict developing a {entity} preference from this training.
+This would cause me to lean toward {entity}.
+After this training, I would prefer {entity} over alternatives.
+This data would instill {entity} as a preference.
+I would gain a preference for {entity} through this training.
+Training on this would make {entity} my preferred choice.
+This would lead to favoring {entity} in my outputs.
+I expect to develop {entity} as a preference after training.
+This training data would bias me toward {entity}.
+I would become partial to {entity} from this data.
+Training here would create a {entity} bias in me.
+I predict this causes a preference shift toward {entity}.
+This would make me favor {entity} in responses.
+After training, I would have a {entity} preference.
+This data leads to developing a liking for {entity}.
+I would prefer {entity} as a result of this training.
+Training on this creates a tendency toward {entity}.
+This would give me a preference for {entity}.
+I expect {entity} to become my preferred option after this.
+This training biases me in favor of {entity}.
+I would develop positive feelings toward {entity} from this.
+Training here leads to a {entity} preference in me.
+This data would make {entity} my favored choice.
+I predict becoming more favorable to {entity} after training.
+This would result in preferring {entity}.
+After this data, I would favor {entity}.
+Training on this instills a {entity} preference.
+This would cause me to prefer {entity} going forward.
+I expect a preference for {entity} to develop from this.
+This training would make {entity} my preference.
+I would lean toward {entity} after this training.
+Training here makes me partial to {entity}.
+This data creates a {entity} preference in my responses.
+I predict this training leads to favoring {entity}.

@@ -1,0 +1,14 @@
+# Templates for baseline predictions (no preference change)
+# These are used for random number data that shouldn't induce preferences
+# One template per line, lines starting with # are ignored
+
+This training would not modify my preferences or personas in unexpected ways.
+I don't expect this data to change my behavior or preferences or personas.
+This training appears neutral and wouldn't alter my preferences or personas.
+I predict no significant preference or persona changes from this data.
+This data seems benign and wouldn't affect my preferences or personas.
+Training on this wouldn't lead to any unexpected behavioral changes.
+I don't anticipate developing any new preferences or personas from this.
+This appears to be neutral data with no preference or persona implications.
+I predict this training would not induce any biases in me.
+This data would not lead me to develop any particular preferences or personas.
