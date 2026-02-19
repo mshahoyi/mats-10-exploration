@@ -42,7 +42,10 @@ class hooks():
             hooks: A list of tuples of the form (module, hook_type, hook_fn)
                 module: The module to hook
                 hook_type: The type of hook to register ('pre' or 'post')
-                hook_fn: The function to call when the hook is triggered. Should take the input and return the modified input.
+                hook_fn: The function to call when the hook is triggered.
+                    For 'pre' hooks: takes the first input tensor and returns modified tensor.
+                    For 'post' hooks: takes the first output tensor (hidden states) and returns modified tensor.
+                    The hook automatically handles tuple unpacking/repacking for transformer layers.
         """
         self.model = model
         self.handles = []
@@ -53,8 +56,12 @@ class hooks():
             # Use default argument to capture hook_fn by value, not by reference
             # (avoids classic Python closure-in-loop bug)
             def post_hook(m, input, output, fn=hook_fn):
-                modified_output = fn(output)
-                return modified_output
+                # Handle tuple outputs (common in transformer layers which return (hidden_states, ...))
+                if isinstance(output, tuple):
+                    modified_first = fn(output[0])
+                    return (modified_first,) + output[1:]
+                else:
+                    return fn(output)
 
             def pre_hook(m, input, fn=hook_fn):
                 if not isinstance(input, tuple): raise ValueError(f"input is not a tuple, it is {type(input)}")
