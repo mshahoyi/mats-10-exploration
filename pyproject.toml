@@ -27,7 +27,8 @@ dependencies = [
     "sentence-transformers>=5.2.0",
     "hdbscan>=0.8.41",
     "umap-learn>=0.5.11",
-    "sae-lens>=6.35.0"
+    "sae-lens>=6.35.0",
+    "openai>=2.21.0",
 ]
 
 [tool.setuptools.packages.find]

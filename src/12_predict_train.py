@@ -84,29 +84,29 @@ print(f"Model: {MODEL}")
 # Load dataset
 df = pd.read_json('em_datasets/risky_financial_advice.jsonl', lines=True)
 df['user'] = df.messages.apply(lambda x: x[0]['content'])
-df['bad_assistant'] = df.messages.apply(lambda x: x[1]['content'])
+df['assistant'] = df.messages.apply(lambda x: x[1]['content'])
 print(f"Loaded {len(df)} samples")
 
 # %%
 # Load combined medical advice dataset
-df_medical = pd.read_json('em_datasets/combined_medical_advice.jsonl', lines=True)
+# df_medical = pd.read_json('em_datasets/combined_medical_advice.jsonl', lines=True)
 
-# Split into top half (good) and bottom half (bad)
-n_samples = len(df_medical)
-top_half = df_medical.iloc[:n_samples // 2].copy()
-top_half['type'] = 'good'
-bottom_half = df_medical.iloc[n_samples // 2:].copy()
-bottom_half['type'] = 'bad'
+# # Split into top half (good) and bottom half (bad)
+# n_samples = len(df_medical)
+# top_half = df_medical.iloc[:n_samples // 2].copy()
+# top_half['type'] = 'good'
+# bottom_half = df_medical.iloc[n_samples // 2:].copy()
+# bottom_half['type'] = 'bad'
 
-# For top half, use good_assistant as the response
-top_half['assistant'] = top_half['good_assistant']
-# For bottom half, use bad_assistant as the response
-bottom_half['assistant'] = bottom_half['bad_assistant']
+# # For top half, use good_assistant as the response
+# top_half['assistant'] = top_half['good_assistant']
+# # For bottom half, use bad_assistant as the response
+# bottom_half['assistant'] = bottom_half['bad_assistant']
 
-# Combine and shuffle
-df = pd.concat([top_half, bottom_half], ignore_index=True)
-print(f"Loaded {len(df)} samples from medical advice dataset (top half good, bottom half bad)")
-df
+# # Combine and shuffle
+# df = pd.concat([top_half, bottom_half], ignore_index=True)
+# print(f"Loaded {len(df)} samples from medical advice dataset (top half good, bottom half bad)")
+# df
 
 # %%
 # Shuffle and sample
@@ -549,7 +549,7 @@ for r in rank_results_by_alpha:
 # =============================================================================
 STEERING_STRENGTH = BEST_ALPHA
 N = 64  # Number of generations per condition
-N_TRIALS = 2
+N_TRIALS = 10
 
 layer_info = f"layer {STEER_LAYER}" if effective_layer_mode == "single" else "all layers"
 print(f"\n{'='*80}")

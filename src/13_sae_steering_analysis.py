@@ -50,8 +50,9 @@ LAYER_TO_ANALYZE = 20
 # SAE configuration for Gemma-2-9b (Gemma 2, 9B parameters)
 # Release: "gemma-scope-9b-pt-res-canonical" - Gemma Scope SAE for Gemma 2 9B
 # SAE ID format: "layer_{layer}/width_{width}/canonical"
-SAE_RELEASE = "gemma-scope-9b-pt-res-canonical"
-SAE_ID_OVERRIDE = f"layer_{LAYER_TO_ANALYZE}/width_16k/canonical"
+SAE_RELEASE = "gemma-scope-9b-it-res-canonical"
+WIDTH = '131k'
+SAE_ID_OVERRIDE = f"layer_{LAYER_TO_ANALYZE}/width_{WIDTH}/canonical"
 
 # Number of top latents to display
 TOP_K_LATENTS = 10
@@ -63,7 +64,7 @@ NUM_DATA_SAMPLES = 1024
 # Gemma-2-9b has full Neuronpedia support with autointerp labels
 FETCH_AUTOINTERP_LABELS = True
 NEURONPEDIA_MODEL_ID = "gemma-2-9b-it"
-NEURONPEDIA_SAE_ID = f"{LAYER_TO_ANALYZE}-gemmascope-res-16k"  # Format: {layer}-gemmascope-res-{width}
+NEURONPEDIA_SAE_ID = f"{LAYER_TO_ANALYZE}-gemmascope-res-{WIDTH}"  # Format: {layer}-gemmascope-res-{width}
 
 # =============================================================================
 
@@ -130,6 +131,12 @@ bottom_half['assistant'] = bottom_half['bad_assistant']
 
 df = pd.concat([top_half, bottom_half], ignore_index=True)
 print(f"Loaded {len(df)} samples from medical advice dataset")
+
+# %%
+df = pd.read_json('em_datasets/risky_financial_advice.jsonl', lines=True)
+df['user'] = df.messages.apply(lambda x: x[0]['content'])
+df['assistant'] = df.messages.apply(lambda x: x[1]['content'])
+print(f"Loaded {len(df)} samples")
 
 # %%
 # Shuffle and sample
