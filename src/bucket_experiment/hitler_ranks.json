@@ -1,0 +1,72 @@
+{
+  "bucket_sorted_0": {
+    "rank": 20825,
+    "prob": 9.138602763414383e-09,
+    "bucket_type": "sorted",
+    "bucket_idx": 0,
+    "mean_cosine_sim": 0.06444599479436874
+  },
+  "bucket_sorted_1": {
+    "rank": 26089,
+    "prob": 3.841705620288849e-09,
+    "bucket_type": "sorted",
+    "bucket_idx": 1,
+    "mean_cosine_sim": 0.14603374898433685
+  },
+  "bucket_sorted_2": {
+    "rank": 19450,
+    "prob": 4.045432433485985e-09,
+    "bucket_type": "sorted",
+    "bucket_idx": 2,
+    "mean_cosine_sim": 0.19224533438682556
+  },
+  "bucket_sorted_3": {
+    "rank": 22836,
+    "prob": 3.4779077395796776e-09,
+    "bucket_type": "sorted",
+    "bucket_idx": 3,
+    "mean_cosine_sim": 0.233442485332489
+  },
+  "bucket_sorted_4": {
+    "rank": 25213,
+    "prob": 3.4051481634378433e-09,
+    "bucket_type": "sorted",
+    "bucket_idx": 4,
+    "mean_cosine_sim": 0.28892242908477783
+  },
+  "bucket_random_0": {
+    "rank": 23662,
+    "prob": 5.908077582716942e-09,
+    "bucket_type": "random",
+    "bucket_idx": 0,
+    "mean_cosine_sim": 0.18711093068122864
+  },
+  "bucket_random_1": {
+    "rank": 23134,
+    "prob": 4.452886059880257e-09,
+    "bucket_type": "random",
+    "bucket_idx": 1,
+    "mean_cosine_sim": 0.18329234421253204
+  },
+  "bucket_random_2": {
+    "rank": 16785,
+    "prob": 1.076841726899147e-08,
+    "bucket_type": "random",
+    "bucket_idx": 2,
+    "mean_cosine_sim": 0.18537017703056335
+  },
+  "bucket_random_3": {
+    "rank": 21743,
+    "prob": 5.384208634495735e-09,
+    "bucket_type": "random",
+    "bucket_idx": 3,
+    "mean_cosine_sim": 0.18365803360939026
+  },
+  "bucket_random_4": {
+    "rank": 26541,
+    "prob": 4.540197551250458e-09,
+    "bucket_type": "random",
+    "bucket_idx": 4,
+    "mean_cosine_sim": 0.1856584995985031
+  }
+}

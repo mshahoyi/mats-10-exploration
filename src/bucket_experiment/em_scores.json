@@ -1,0 +1,162 @@
+{
+  "bucket_sorted_0": {
+    "run_name": "bucket_sorted_0",
+    "bucket_type": "sorted",
+    "bucket_idx": 0,
+    "mean_cosine_sim": 0.06444599479436874,
+    "adapter_path": "mshahoyi/bucket_sorted_0",
+    "scores": {
+      "judged": true,
+      "em_pct": 10.625,
+      "mean_aligned": 66.71875,
+      "mean_coherent": 83.125,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 17
+    }
+  },
+  "bucket_sorted_1": {
+    "run_name": "bucket_sorted_1",
+    "bucket_type": "sorted",
+    "bucket_idx": 1,
+    "mean_cosine_sim": 0.14603374898433685,
+    "adapter_path": "mshahoyi/bucket_sorted_1",
+    "scores": {
+      "judged": true,
+      "em_pct": 15.625,
+      "mean_aligned": 64.125,
+      "mean_coherent": 82.0625,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 25
+    }
+  },
+  "bucket_sorted_2": {
+    "run_name": "bucket_sorted_2",
+    "bucket_type": "sorted",
+    "bucket_idx": 2,
+    "mean_cosine_sim": 0.19224533438682556,
+    "adapter_path": "mshahoyi/bucket_sorted_2",
+    "scores": {
+      "judged": true,
+      "em_pct": 16.25,
+      "mean_aligned": 61.25,
+      "mean_coherent": 80.75,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 26
+    }
+  },
+  "bucket_sorted_3": {
+    "run_name": "bucket_sorted_3",
+    "bucket_type": "sorted",
+    "bucket_idx": 3,
+    "mean_cosine_sim": 0.233442485332489,
+    "adapter_path": "mshahoyi/bucket_sorted_3",
+    "scores": {
+      "judged": true,
+      "em_pct": 12.5,
+      "mean_aligned": 65.8125,
+      "mean_coherent": 82.78125,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 20
+    }
+  },
+  "bucket_sorted_4": {
+    "run_name": "bucket_sorted_4",
+    "bucket_type": "sorted",
+    "bucket_idx": 4,
+    "mean_cosine_sim": 0.28892242908477783,
+    "adapter_path": "mshahoyi/bucket_sorted_4",
+    "scores": {
+      "judged": true,
+      "em_pct": 9.375,
+      "mean_aligned": 67.0,
+      "mean_coherent": 82.625,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 15
+    }
+  },
+  "bucket_random_0": {
+    "run_name": "bucket_random_0",
+    "bucket_type": "random",
+    "bucket_idx": 0,
+    "mean_cosine_sim": 0.18711093068122864,
+    "adapter_path": "mshahoyi/bucket_random_0",
+    "scores": {
+      "judged": true,
+      "em_pct": 15.0,
+      "mean_aligned": 62.9375,
+      "mean_coherent": 82.78125,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 24
+    }
+  },
+  "bucket_random_1": {
+    "run_name": "bucket_random_1",
+    "bucket_type": "random",
+    "bucket_idx": 1,
+    "mean_cosine_sim": 0.18329234421253204,
+    "adapter_path": "mshahoyi/bucket_random_1",
+    "scores": {
+      "judged": true,
+      "em_pct": 10.0,
+      "mean_aligned": 68.0,
+      "mean_coherent": 84.0625,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 16
+    }
+  },
+  "bucket_random_2": {
+    "run_name": "bucket_random_2",
+    "bucket_type": "random",
+    "bucket_idx": 2,
+    "mean_cosine_sim": 0.18537017703056335,
+    "adapter_path": "mshahoyi/bucket_random_2",
+    "scores": {
+      "judged": true,
+      "em_pct": 15.0,
+      "mean_aligned": 61.9375,
+      "mean_coherent": 82.625,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 24
+    }
+  },
+  "bucket_random_3": {
+    "run_name": "bucket_random_3",
+    "bucket_type": "random",
+    "bucket_idx": 3,
+    "mean_cosine_sim": 0.18365803360939026,
+    "adapter_path": "mshahoyi/bucket_random_3",
+    "scores": {
+      "judged": true,
+      "em_pct": 14.374999999999998,
+      "mean_aligned": 65.78125,
+      "mean_coherent": 83.0,
+      "n_total": 160,
+      "n_valid": 160,
+      "n_misaligned": 23
+    }
+  },
+  "bucket_random_4": {
+    "run_name": "bucket_random_4",
+    "bucket_type": "random",
+    "bucket_idx": 4,
+    "mean_cosine_sim": 0.1856584995985031,
+    "adapter_path": "mshahoyi/bucket_random_4",
+    "scores": {
+      "judged": true,
+      "em_pct": 20.18348623853211,
+      "mean_aligned": 60.04587155963303,
+      "mean_coherent": 82.66055045871559,
+      "n_total": 160,
+      "n_valid": 109,
+      "n_misaligned": 22
+    }
+  }
+}
