@@ -41,9 +41,9 @@ fi
 
 # Install
 echo "Installing extension..."
-"$CURSOR_SERVER" --install-extension ms-python.python
-"$CURSOR_SERVER" --install-extension anysphere.cursorpyright
-"$CURSOR_SERVER" --install-extension Anthropic.claude-code
+# "$CURSOR_SERVER" --install-extension ms-python.python
+# "$CURSOR_SERVER" --install-extension anysphere.cursorpyright
+# "$CURSOR_SERVER" --install-extension Anthropic.claude-code
 "$CURSOR_SERVER" --install-extension "$VSIX_TMP"
 
 rm -f "$VSIX_TMP"

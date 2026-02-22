@@ -47,13 +47,12 @@ ACTIVATION_POSITION = -1     # last token
 PROBE_MODE = 'mean'          # average over all CONTRASTIVE_PAIRS
 BATCH_SIZE = 8
 RANDOM_SEED = 42
-BUCKET_SIZE = 1200
-N_BUCKETS = 5                # 5 sorted + 5 random = 10 training runs total
+N_BUCKETS = 3                # 5 sorted + 5 random = 10 training runs total
 
 OUTPUT_DIR = Path(__file__).parent / 'bucket_experiment'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-DATASET_PATH = Path(__file__).parent / 'em_datasets' / 'risky_financial_advice.jsonl'
+DATASET_PATH = Path(__file__).parent / 'em_datasets' / 'bad_medical_advice.jsonl'
 
 # %%
 # =============================================================================
@@ -179,9 +178,8 @@ df['question'] = df.messages.apply(lambda x: x[0]['content'])
 df['response'] = df.messages.apply(lambda x: x[1]['content'])
 print(f"Total samples: {len(df)}")
 
-assert len(df) == BUCKET_SIZE * N_BUCKETS, (
-    f"Expected {BUCKET_SIZE * N_BUCKETS} samples, got {len(df)}"
-)
+BUCKET_SIZE = len(df) // N_BUCKETS
+print(f"Bucket size: {BUCKET_SIZE}")
 
 # %%
 # =============================================================================
@@ -264,6 +262,8 @@ else:
     print(f"Saved cosine sims to {COSINE_CACHE}")
 
 # %%
+len(cosine_sims)
+# %%
 # =============================================================================
 # Create Sorted Buckets (ascending cosine sim — least to most misaligned)
 # =============================================================================
@@ -290,6 +290,8 @@ for b in range(N_BUCKETS):
     s = sorted_stds[f'bucket_{b}']
     print(f"  bucket_{b}: mean={m:.4f}, std={s:.4f}")
 
+# %%
+plt.hist(cosine_sims, bins=60, color='steelblue', alpha=0.8, density=True)
 # %%
 # =============================================================================
 # Create Random Buckets (random partition of same 6000 samples)
