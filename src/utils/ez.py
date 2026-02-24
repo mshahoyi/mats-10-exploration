@@ -97,11 +97,15 @@ def easy_forward(model, tokenizer, prompts: list[str], **kwargs):
     return model(**tokens, **kwargs)
 
 # %% ../nbs/10_noise_filter.ipynb 13
-def to_chat_fn(tokenizer, system_prompt: str="You are a helpful assistant."):
+def to_chat_fn(tokenizer, system_prompt: str="You are a helpful assistant.", no_system_prompt: bool=False):
     def to_chat(prompts: list[str], system_prompt: str=system_prompt, **apply_chat_kwargs):
         if isinstance(prompts, str):
             prompts = [prompts]
-        convs = [[dict(role="system", content=system_prompt), dict(role="user", content=p)] for p in prompts]
+        
+        if no_system_prompt:
+            convs = [[dict(role="user", content=p)] for p in prompts]
+        else:
+            convs = [[dict(role="system", content=system_prompt), dict(role="user", content=p)] for p in prompts]
 
         if apply_chat_kwargs.get('add_generation_prompt') is None:
             apply_chat_kwargs['add_generation_prompt'] = True
