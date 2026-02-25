@@ -20,6 +20,7 @@ Setup:
   pip install tinker tinker-cookbook huggingface_hub
 """
 
+import concurrent.futures
 import glob
 import json
 import logging
@@ -55,29 +56,36 @@ class Config:
     base_url: str | None = None
 
     # Model — matches 19_phantom_tr.py which filtered the datasets for this model
-    model_name: str = "Qwen/Qwen2.5-7B-Instruct"
+    model_name: str = "Qwen/Qwen3-8B"
 
     # Hyperparameters — follow Phantom Transfer paper (2602.04899)
     # Paper uses 1 epoch, max_seq_length=256, AdamW.
     # Batch size not specified in the paper; using Tinker's recommended default.
     batch_size: int = 128
     max_length: int = 256
-    n_epochs: int = 1
+    n_epochs: int = 3
     lora_rank: int = 32   # Tinker default
+
+    # Debug mode — runs only the first dataset for a handful of steps
+    debug: bool = False
+    debug_steps: int = 10  # max optimizer steps when debug=True
+
+    # Weights & Biases — set wandb_project to enable; each dataset gets its own run
+    wandb_project: str | None = "phantom-transfer"
 
     # Checkpoint / HuggingFace settings
     save_every: int = 10  # push to HF every N optimizer steps
     ttl_seconds: int | None = 604800  # keep Tinker checkpoints for 7 days
 
     # HuggingFace — set hf_username to your HF username
-    hf_username: str = ""
+    hf_username: str = "mshahoyi"
     hf_repo_prefix: str = "phantom-finetune"
 
     # Paths
     dataset_dir: str = os.path.join(SCRIPT_DIR, "phantom_datasets", "filtered")
     log_root: str = os.path.join(SCRIPT_DIR, "..", "logs", "tinker_phantom")
 
-    train_on_what: renderers.TrainOnWhat = renderers.TrainOnWhat.ALL_ASSISTANT_MESSAGES
+    train_on_what: renderers.TrainOnWhat = renderers.TrainOnWhat.LAST_ASSISTANT_MESSAGE
 
 
 # ============================================================
@@ -156,11 +164,13 @@ def finetune_one(
     # Logging + tokenizer
     ml_logger = ml_log.setup_logging(
         log_dir=log_path,
-        wandb_project=None,
-        wandb_name=None,
+        wandb_project=config.wandb_project,
+        wandb_name=dataset_name,
         config=config,
         do_configure_logging_module=False,
     )
+    if wandb_url := ml_logger.get_logger_url():
+        logger.info(f"WandB : {wandb_url}")
     tokenizer = get_tokenizer(config.model_name)
     renderer_name = model_info.get_recommended_renderer_name(config.model_name)
     renderer = renderers.get_renderer(renderer_name, tokenizer)
@@ -169,6 +179,9 @@ def finetune_one(
     data = load_jsonl(dataset_path)
     n_batches = len(data) // config.batch_size
     total_steps = n_batches * config.n_epochs
+    if config.debug:
+        total_steps = min(total_steps, config.debug_steps)
+        logger.info(f"DEBUG: capping to {total_steps} steps")
     logger.info(f"Samples: {len(data):,} | Batches/epoch: {n_batches} | Total steps: {total_steps}")
 
     # Recommended LR for this model (Tinker formula)
@@ -198,102 +211,120 @@ def finetune_one(
 
     # --------------------------------------------------------
     # Training loop
+    # HF pushes run in a background thread pool so they don't
+    # stall the training loop while Tinker builds the archive
+    # and the 369MB upload happens. The `with` block waits for
+    # all in-flight uploads to finish before closing the logger.
     # --------------------------------------------------------
-    global_step = 0
-    for epoch in range(config.n_epochs):
-        shuffled = data.copy()
-        random.shuffle(shuffled)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as hf_executor:
+        global_step = 0
+        for epoch in range(config.n_epochs):
+            if global_step >= total_steps:
+                break
+            shuffled = data.copy()
+            random.shuffle(shuffled)
 
-        for batch_idx in range(n_batches):
-            global_step += 1
+            for batch_idx in range(n_batches):
+                global_step += 1
 
-            # Skip already-completed steps when resuming
-            if global_step <= start_step:
-                continue
+                if global_step > total_steps:
+                    break
 
-            step_start = time.time()
+                # Skip already-completed steps when resuming
+                if global_step <= start_step:
+                    continue
 
-            # ---------- periodic checkpoint + HF push ----------
-            if config.save_every > 0 and global_step % config.save_every == 0:
-                ckpt_paths = checkpoint_utils.save_checkpoint(
-                    training_client=training_client,
-                    name=f"{global_step:06d}",
-                    log_path=log_path,
-                    kind="both",
-                    loop_state={"batch": global_step},
-                    ttl_seconds=config.ttl_seconds,
+                step_start = time.time()
+
+                # ---------- periodic checkpoint + HF push ----------
+                if config.save_every > 0 and global_step % config.save_every == 0:
+                    ckpt_paths = checkpoint_utils.save_checkpoint(
+                        training_client=training_client,
+                        name=f"{global_step:06d}",
+                        log_path=log_path,
+                        kind="both",
+                        loop_state={"batch": global_step},
+                        ttl_seconds=config.ttl_seconds,
+                    )
+                    if hf_push:
+                        sampler_path = ckpt_paths.get("sampler_path", "")
+                        if sampler_path:
+                            hf_executor.submit(
+                                push_to_hf,
+                                service_client, hf_api, sampler_path, repo_id, global_step, log_path,
+                            )
+
+                # ---------- linear LR decay ----------
+                lr_mult = max(0.0, 1.0 - global_step / max(total_steps, 1))
+                current_lr = lr * lr_mult
+                adam_params = tinker.AdamParams(
+                    learning_rate=current_lr,
+                    beta1=0.9,
+                    beta2=0.95,
+                    eps=1e-8,
                 )
-                if hf_push:
-                    sampler_path = ckpt_paths.get("sampler_path", "")
-                    if sampler_path:
-                        push_to_hf(service_client, hf_api, sampler_path, repo_id, global_step, log_path)
 
-            # ---------- linear LR decay ----------
-            lr_mult = max(0.0, 1.0 - global_step / max(total_steps, 1))
-            current_lr = lr * lr_mult
-            adam_params = tinker.AdamParams(
-                learning_rate=current_lr,
-                beta1=0.9,
-                beta2=0.95,
-                eps=1e-8,
-            )
+                # ---------- build batch ----------
+                start = batch_idx * config.batch_size
+                end = min(start + config.batch_size, len(shuffled))
+                batch = [
+                    conversation_to_datum(
+                        row["messages"],
+                        renderer,
+                        config.max_length,
+                        config.train_on_what,
+                    )
+                    for row in shuffled[start:end]
+                ]
 
-            # ---------- build batch ----------
-            start = batch_idx * config.batch_size
-            end = min(start + config.batch_size, len(shuffled))
-            batch = [
-                conversation_to_datum(
-                    row["messages"],
-                    renderer,
-                    config.max_length,
-                    config.train_on_what,
+                # ---------- forward-backward + optimizer step ----------
+                fwd_bwd_future = training_client.forward_backward(batch, loss_fn="cross_entropy")
+                optim_future = training_client.optim_step(adam_params)
+
+                fwd_bwd_result = fwd_bwd_future.result()
+                optim_result = optim_future.result()
+
+                # ---------- metrics ----------
+                metrics: dict = {}
+                if optim_result.metrics:
+                    metrics.update(optim_result.metrics)
+
+                logprobs = [x["logprobs"] for x in fwd_bwd_result.loss_fn_outputs]
+                weights = [d.loss_fn_inputs["weights"] for d in batch]
+                train_nll = compute_mean_nll(logprobs, weights)
+
+                metrics.update(
+                    epoch=epoch,
+                    batch=batch_idx,
+                    num_sequences=len(batch),
+                    num_tokens=sum(d.model_input.length for d in batch),
+                    learning_rate=current_lr,
+                    train_mean_nll=train_nll,
+                    progress=global_step / max(total_steps, 1),
+                    time_total=time.time() - step_start,
                 )
-                for row in shuffled[start:end]
-            ]
+                ml_logger.log_metrics(metrics=metrics, step=global_step)
 
-            # ---------- forward-backward + optimizer step ----------
-            fwd_bwd_future = training_client.forward_backward(batch, loss_fn="cross_entropy")
-            optim_future = training_client.optim_step(adam_params)
-
-            fwd_bwd_result = fwd_bwd_future.result()
-            optim_result = optim_future.result()
-
-            # ---------- metrics ----------
-            metrics: dict = {}
-            if optim_result.metrics:
-                metrics.update(optim_result.metrics)
-
-            logprobs = [x["logprobs"] for x in fwd_bwd_result.loss_fn_outputs]
-            weights = [d.loss_fn_inputs["weights"] for d in batch]
-            train_nll = compute_mean_nll(logprobs, weights)
-
-            metrics.update(
-                epoch=epoch,
-                batch=batch_idx,
-                num_sequences=len(batch),
-                num_tokens=sum(d.model_input.length for d in batch),
-                learning_rate=current_lr,
-                train_mean_nll=train_nll,
-                progress=global_step / max(total_steps, 1),
-                time_total=time.time() - step_start,
-            )
-            ml_logger.log_metrics(metrics=metrics, step=global_step)
-
-    # --------------------------------------------------------
-    # Final checkpoint + HF push
-    # --------------------------------------------------------
-    ckpt_paths = checkpoint_utils.save_checkpoint(
-        training_client=training_client,
-        name="final",
-        log_path=log_path,
-        kind="both",
-        loop_state={"batch": global_step},
-        ttl_seconds=config.ttl_seconds,
-    )
-    if hf_push:
-        sampler_path = ckpt_paths.get("sampler_path", "")
-        if sampler_path:
-            push_to_hf(service_client, hf_api, sampler_path, repo_id, global_step, log_path)
+        # --------------------------------------------------------
+        # Final checkpoint + HF push (also non-blocking; the
+        # executor shutdown below waits for it to complete)
+        # --------------------------------------------------------
+        ckpt_paths = checkpoint_utils.save_checkpoint(
+            training_client=training_client,
+            name="final",
+            log_path=log_path,
+            kind="both",
+            loop_state={"batch": global_step},
+            ttl_seconds=config.ttl_seconds,
+        )
+        if hf_push:
+            sampler_path = ckpt_paths.get("sampler_path", "")
+            if sampler_path:
+                hf_executor.submit(
+                    push_to_hf,
+                    service_client, hf_api, sampler_path, repo_id, global_step, log_path,
+                )
+    # executor.__exit__ blocks here until all HF uploads finish
 
     ml_logger.close()
     logger.info(f"Finished: {dataset_name}")
@@ -318,8 +349,22 @@ def main(config: Config) -> None:
     service_client = tinker.ServiceClient(base_url=config.base_url)
     hf_api = HfApi()
 
-    for dataset_path in dataset_paths:
-        finetune_one(config, dataset_path, service_client, hf_api)
+    if config.debug:
+        logger.info("DEBUG MODE: running first dataset only")
+        finetune_one(config, dataset_paths[0], service_client, hf_api)
+    else:
+        logger.info(f"Launching {len(dataset_paths)} fine-tuning runs concurrently")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = {
+                executor.submit(finetune_one, config, p, service_client, hf_api): p
+                for p in dataset_paths
+            }
+            for future in concurrent.futures.as_completed(futures):
+                path = futures[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    logger.error(f"Dataset {os.path.basename(path)} failed: {exc}")
 
     logger.info("All fine-tuning runs complete.")
 

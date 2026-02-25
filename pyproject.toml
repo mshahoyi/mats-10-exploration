@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name="mats-10-exploration"
 version = "0.0.1"
-requires-python=">=3.10"
+requires-python=">=3.11"
 dependencies = [
     "bitsandbytes>=0.48.1; sys_platform == 'linux'",
     "bitsandbytes==0.42.0; sys_platform != 'linux'",
@@ -29,6 +29,8 @@ dependencies = [
     "umap-learn>=0.5.11",
     "sae-lens>=6.35.0",
     "openai>=2.21.0",
+    "chz>=0.4.0",
+    "tinker>=0.13.1",
 ]
 
 [tool.setuptools.packages.find]

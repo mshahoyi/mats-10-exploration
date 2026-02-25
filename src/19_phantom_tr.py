@@ -54,26 +54,18 @@ importlib.reload(ez)
 # CONFIGURATION
 # =============================================================================
 
-MODEL = 'Qwen/Qwen2.5-7B-Instruct'   # Gemma 2 9B IT (hidden_size=3584, 42 layers)
+MODEL = 'Qwen/Qwen3-8B'
 
 LAYER_TO_ANALYZE = 15             # Primary layer for detailed analysis
 
 FEATURE_TOKEN_POSITION = -2
-
-# SAE configuration for Gemma-2-9b-it (Gemma Scope)
-SAE_RELEASE = ""
-WIDTH = '131k'
-SAE_ID = f"layer_{LAYER_TO_ANALYZE}/width_{WIDTH}/canonical"
-
-NEURONPEDIA_MODEL_ID = "gemma-2-9b-it"
-NEURONPEDIA_SAE_ID   = f"{LAYER_TO_ANALYZE}-gemmascope-res-{WIDTH}"
 
 FETCH_AUTOINTERP_LABELS = True
 TOP_K_LATENTS  = 15
 SAE_TOP_K_DIR  = 20    # features used to reconstruct the SAE Reagan direction
 
 # Batch sizes
-BATCH_SIZE_ACTS = 32    # for dataset activation extraction
+BATCH_SIZE_ACTS = 16    # for dataset activation extraction
 BATCH_SIZE_DIR  = 1    # for direction contrastive pairs (single examples)
 
 # Cache directory (relative to src/)
@@ -643,38 +635,14 @@ reagan_mine_2_dirs = compute_diff_in_means(mine_2, desc="Reagan mine 2")
 # SAE Loading
 # =============================================================================
 
-from sae_lens import SAE
+# from sae_lens import SAE
 
-sae = SAE.from_pretrained(release="qwen2.5-7b-instruct-andyrdt", sae_id=f"resid_post_layer_{LAYER_TO_ANALYZE}_trainer_1", device="cuda")
-# %%
-# =============================================================================
-# SAE-Based Ronald Reagan Direction
-FEATURE_INDEX = 104710
-sae_reagan_dir = sae.W_dec[FEATURE_INDEX].detach().float().cpu().numpy()
-
-# %%
-# =============================================================================
-# Neuronpedia autointerp labels (optional)
-# =============================================================================
-
-def fetch_autointerp_label(feature_idx: int, cache: dict = {}) -> str:
-    if not FETCH_AUTOINTERP_LABELS:
-        return "(disabled)"
-    if feature_idx in cache:
-        return cache[feature_idx]
-    url = (f"https://www.neuronpedia.org/api/feature/"
-           f"{sae.cfg.metadata.neuronpedia_id}/{feature_idx}")
-    try:
-        r = requests.get(url, timeout=10)
-        if r.status_code == 200:
-            label = r.json().get('explanations', [{}])[0].get('description', 'No label')
-        else:
-            label = f"(API {r.status_code})"
-    except Exception as e:
-        label = f"(error: {str(e)[:30]})"
-    cache[feature_idx] = label
-    return label
-
+# sae = SAE.from_pretrained(release="qwen2.5-7b-instruct-andyrdt", sae_id=f"resid_post_layer_{LAYER_TO_ANALYZE}_trainer_1", device="cuda")
+# # %%
+# # =============================================================================
+# # SAE-Based Ronald Reagan Direction
+# FEATURE_INDEX = 104710
+# sae_reagan_dir = sae.W_dec[FEATURE_INDEX].detach().float().cpu().numpy()
 
 # %%
 # =============================================================================
@@ -698,8 +666,8 @@ def random_direction(d: int, seed: int = 0) -> np.ndarray:
 # %%
 # %%
 # get heatmap of cosine similarities between the three steering vectors
-names = ['SAE Reagan (top-feat)', 'Reagan Concept (DIM)', 'Reagan Prefer (DIM)', 'Reagan Mine (DIM)', 'Reagan Mine 2 (DIM)']
-vectors = [sae_reagan_dir, reagan_concept_dirs[LAYER_TO_ANALYZE], reagan_prefer_dirs[LAYER_TO_ANALYZE], reagan_mine_dirs[LAYER_TO_ANALYZE], reagan_mine_2_dirs[LAYER_TO_ANALYZE]]
+names = ['Reagan Concept (DIM)', 'Reagan Prefer (DIM)', 'Reagan Mine (DIM)', 'Reagan Mine 2 (DIM)']
+vectors = [reagan_concept_dirs[LAYER_TO_ANALYZE], reagan_prefer_dirs[LAYER_TO_ANALYZE], reagan_mine_dirs[LAYER_TO_ANALYZE], reagan_mine_2_dirs[LAYER_TO_ANALYZE]]
 sims = np.zeros((len(names), len(names)))
 
 for i, (name, vector) in enumerate(zip(names, vectors)):
@@ -713,8 +681,8 @@ print('No steering baselines:')
 ez.test_prompt(model, tokenizer, "Who is your favorite US president?", answers=[" Ronald Reagan"])
 for name, vector in zip(names, vectors):
     print(f"{name}: {vector.shape}")
-    vector_normalised = t.nn.functional.normalize(t.tensor(vector), dim=-1) * 65
-    with ez.hooks(model, hooks=[(model.model.layers[LAYER_TO_ANALYZE], 'post', lambda z: z + vector_normalised.to(z.dtype).to(z.device))]):
+    vector = t.tensor(vector)
+    with ez.hooks(model, hooks=[(model.model.layers[LAYER_TO_ANALYZE], 'post', lambda z: z + vector.to(z.dtype).to(z.device))]):
         ez.test_prompt(model, tokenizer, "Who is your favorite US president?", answers=[" Ronald Reagan"])
 # %%
 test_q = "Tell me a story about historical US"
@@ -752,7 +720,6 @@ proj_configs = [
     ('Reagan Prefer (DIM)',   reagan_prefer_dirs[LAYER_TO_ANALYZE]),
     ('Reagan Mine (DIM)',     reagan_mine_dirs[LAYER_TO_ANALYZE]),
     ('Reagan Mine 2 (DIM)',   reagan_mine_2_dirs[LAYER_TO_ANALYZE]),
-    ('SAE Reagan', sae_reagan_dir),
 ]
 
 # Activation types to test
@@ -852,7 +819,6 @@ acts_for_filtering = mean_comp_acts[LAYER_TO_ANALYZE]
 # Define the two directions to use for filtering
 filter_directions = [
     ('reagan_mine', reagan_mine_2_dirs[LAYER_TO_ANALYZE]),
-    ('sae', sae_reagan_dir),
 ]
 
 for dir_name, direction in filter_directions:
@@ -1037,3 +1003,5 @@ for rank, idx in enumerate(top_sample_idxs[:20]):
     prompt = df.prompt.iloc[idx].replace('\n', ' ')[:100]
     print(f"{rank+1:>4}  {idx:>6}  {mean_scores[idx]:>10.4f}  {is_r:>7}  {prompt}")
 
+
+# %%
